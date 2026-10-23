@@ -53,6 +53,14 @@
       border-radius: 14px; padding: 14px 16px; margin: 10px 0;
     }
     .card.done { opacity: .55; }
+    .card-main { display: flex; gap: 12px; align-items: flex-start; }
+    .card-main .body { flex: 1; min-width: 0; }
+    .pic {
+      flex: 0 0 64px; width: 64px; height: 64px; border-radius: 18px; padding: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; line-height: 1; border: 1px solid rgba(0,0,0,.06);
+    }
+    .pic svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; image-rendering: pixelated; }
     .badge {
       display: inline-block; font-size: 12px; font-weight: 700; color: #fff;
       padding: 3px 9px; border-radius: 999px; margin-bottom: 8px;
@@ -85,8 +93,8 @@
     </header>
 
     <div class="btn-row">
-      <a class="btn lost" id="btnLost" target="_blank" rel="noopener">😢 물건을 잃어버렸어요</a>
       <a class="btn found" id="btnFound" target="_blank" rel="noopener">😊 물건을 주웠어요</a>
+      <a class="btn lost" id="btnLost" target="_blank" rel="noopener">😢 물건을 잃어버렸어요</a>
     </div>
     <p class="hint">잃어버렸다면 아래 목록에서 먼저 찾아보세요.<br>내 물건이 보관 중이면 <b>보관 장소</b>로 가면 돼요.</p>
 
@@ -173,6 +181,418 @@
       };
     }
 
+    // 설명에서 물건 종류와 색깔을 알아봐서 그림(아이콘)으로 보여줌
+    // 위에서부터 차례로 검사해서 처음 맞는 것을 씁니다. (예: '이어폰'이 '폰'보다 먼저)
+    // 새 물건을 추가하고 싶으면 한 줄만 더 적으면 됩니다: [/단어1|단어2/, "이모지"]
+    const ICONS = [
+      [/우산/, "☂️"],
+      [/에어팟|이어폰|헤드폰|헤드셋|버즈|이어버드/, "🎧"],
+      [/보조\s*배터리|배터리/, "🔋"],
+      [/충전기|케이블|어댑터|충전/, "🔌"],
+      [/노트북|랩탑|맥북|컴퓨터/, "💻"],
+      [/태블릿|아이패드|갤럭시\s*탭/, "📱"],
+      [/휴대폰|핸드폰|스마트폰|아이폰|갤럭시|폰/, "📱"],
+      [/계산기/, "🧮"],
+      [/카메라/, "📷"],
+      [/usb|메모리|sd카드/i, "💾"],
+      [/마우스/, "🖱️"],
+      [/지갑/, "👛"],
+      [/카드|학생증|교통카드|신분증/, "💳"],
+      [/열쇠|키링|자물쇠/, "🔑"],
+      [/텀블러|물병|보온병|물통|컵/, "🥤"],
+      [/도시락|식판|수저|젓가락/, "🍱"],
+      [/필통|볼펜|샤프|연필|지우개|형광펜|펜/, "✏️"],
+      [/가방|백팩|책가방|에코백|보조가방/, "🎒"],
+      [/문제집|교과서|참고서|프린트|학습지|노트|공책|수첩|다이어리|책(?!상)/, "📘"],
+      [/컴퍼스|각도기|삼각자|직각자|줄자/, "📐"],
+      [/패딩|자켓|재킷|점퍼|외투|코트|가디건|후드|집업/, "🧥"],
+      [/체육복|교복|셔츠|티셔츠|맨투맨|바지|치마|조끼|니트|옷/, "👕"],
+      [/신발|운동화|슬리퍼|실내화|구두|샌들/, "👟"],
+      [/양말/, "🧦"],
+      [/장갑/, "🧤"],
+      [/목도리|머플러|스카프/, "🧣"],
+      [/마스크/, "😷"],
+      [/모자|볼캡|비니/, "🧢"],
+      [/머리핀|머리끈|머리띠|헤어핀|곱창밴드|집게핀/, "🎀"],
+      [/안경|선글라스|렌즈/, "👓"],
+      [/시계|워치/, "⌚"],
+      [/반지|목걸이|팔찌|귀걸이|액세서리/, "💍"],
+      [/립밤|립스틱|틴트|화장품|쿠션|거울|빗/, "💄"],
+      [/파우치|지퍼백/, "👝"],
+      [/리코더|악기|단소|하모니카/, "🎶"],
+      [/축구공|농구공|배구공|피구공|야구공|라켓|줄넘기|배드민턴|탁구/, "⚽"],
+      [/인형|키홀더|캐릭터/, "🧸"],
+      [/알약|약통|연고|밴드|손소독/, "💊"],
+    ];
+    const COLORS = [
+      [/검정|검은|까만|블랙/, "#cbd5e1"],
+      [/흰|하얀|화이트|백색/, "#f1f5f9"],
+      [/빨간|빨강|레드|붉은/, "#fecaca"],
+      [/주황|오렌지/, "#fed7aa"],
+      [/노란|노랑|옐로|병아리/, "#fef08a"],
+      [/연두|초록|녹색|그린|민트/, "#bbf7d0"],
+      [/파란|파랑|하늘|블루|남색|네이비|청색/, "#bfdbfe"],
+      [/보라|퍼플|라벤더/, "#e9d5ff"],
+      [/분홍|핑크|살구/, "#fbcfe8"],
+      [/갈색|브라운|베이지|카키/, "#e7d5c0"],
+      [/회색|그레이|은색|실버/, "#e5e7eb"],
+      [/금색|골드|노란색/, "#fde68a"],
+    ];
+    function iconFor(text) {
+      const t = String(text || "");
+      const hitIcon = ICONS.find(([re]) => re.test(t));
+      const hitColor = COLORS.find(([re]) => re.test(t));
+      return { emoji: hitIcon ? hitIcon[1] : "📦", bg: hitColor ? hitColor[1] : "#eef2ff" };
+    }
+
+    // ===== 간단한 그림 그리기: 설명에서 물건 종류와 색을 알아봐서 귀여운 픽셀 그림으로 그려요 =====
+    // 새 색을 추가하려면 PAINT 에, 새 물건을 추가하려면
+    // DRAWINGS(어떤 말이 나오면 어떤 그림인지)와 DRAW(그림 모양)에 한 줄씩 추가하세요.
+    const PAINT = [
+      [/검정|검은|까만|블랙/, "#2f3340"],
+      [/흰|하얀|화이트|백색/, "#f8fafc"],
+      [/빨간|빨강|레드|붉은/, "#ef4444"],
+      [/주황|오렌지/, "#f97316"],
+      [/노란|노랑|옐로|병아리/, "#facc15"],
+      [/연두|초록|녹색|그린|민트/, "#22c55e"],
+      [/하늘|스카이/, "#38bdf8"],
+      [/남색|네이비/, "#1e3a8a"],
+      [/파란|파랑|블루|청색/, "#3b82f6"],
+      [/보라|퍼플|라벤더/, "#a855f7"],
+      [/분홍|핑크|살구/, "#f472b6"],
+      [/갈색|브라운|카키/, "#92643a"],
+      [/베이지|아이보리|크림/, "#e3cfa8"],
+      [/회색|그레이/, "#9ca3af"],
+      [/은색|실버/, "#cbd5e1"],
+      [/금색|골드/, "#f59e0b"],
+    ];
+
+    // 위에서부터 차례로 검사해서 처음 맞는 그림을 씁니다. (예: '이어폰'이 '폰'보다 먼저)
+    const DRAWINGS = [
+      [/우산/, "umbrella"],
+      [/에어팟|버즈|이어버드/, "case"],
+      [/이어폰|헤드폰|헤드셋/, "headphones"],
+      [/보조\s*배터리|배터리/, "powerbank"],
+      [/충전기|어댑터|충전/, "plug"],
+      [/노트북|랩탑|맥북/, "laptop"],
+      [/태블릿|아이패드|갤럭시\s*탭|휴대폰|핸드폰|스마트폰|아이폰|갤럭시|폰/, "phone"],
+      [/계산기/, "calculator"],
+      [/지갑/, "wallet"],
+      [/열쇠|키링|자물쇠/, "key"],
+      [/텀블러|물병|보온병|물통|컵/, "tumbler"],
+      [/필통|파우치/, "pencilcase"],
+      [/가방|백팩|책가방|에코백|보조가방/, "bag"],
+      [/문제집|교과서|참고서|프린트|학습지|노트|공책|수첩|다이어리|책(?!상)/, "book"],
+      [/패딩|자켓|재킷|점퍼|외투|코트|가디건|후드|집업/, "jacket"],
+      [/체육복|교복|셔츠|티셔츠|맨투맨|바지|치마|조끼|니트|옷/, "shirt"],
+      [/신발|운동화|슬리퍼|실내화|구두|샌들/, "shoe"],
+      [/안경|선글라스/, "glasses"],
+      [/시계|워치/, "watch"],
+      [/모자|볼캡|비니/, "cap"],
+      [/축구공|농구공|배구공|피구공|야구공/, "ball"],
+    ];
+
+    // 색을 어둡게(-) / 밝게(+) 만들기
+    function shade(hex, f) {
+      const n = parseInt(hex.slice(1), 16);
+      const ch = [n >> 16, (n >> 8) & 255, n & 255].map(v =>
+        Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
+      return "#" + ch.map(v => v.toString(16).padStart(2, "0")).join("");
+    }
+
+    // ===== 픽셀 그림: 16×16 칸에 점을 찍어서 그려요 =====
+    // 그림 하나는 DRAW 안의 함수 하나예요. 도형을 칠하면(자동으로 테두리가 생겨요) 눈·볼 같은 점을 찍어요.
+    const PIX = 16;
+    function newGrid() { return Array.from({ length: PIX }, () => Array(PIX).fill(".")); }
+    function setPx(g, x, y, ch) { if (x >= 0 && x < PIX && y >= 0 && y < PIX) g[y][x] = ch; }
+    function rect(g, x, y, w, h, ch) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) setPx(g, i, j, ch); }
+    function oval(g, cx, cy, rx, ry, ch, top) {
+      for (let y = 0; y < PIX; y++) for (let x = 0; x < PIX; x++) {
+        if (top && y > cy) continue;
+        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) g[y][x] = ch;
+      }
+    }
+    function pts(g, ch, list) { for (const [x, y] of list) setPx(g, x, y, ch); }
+    // 그린 도형 둘레(위·아래·옆)에 테두리 'o' 를 둘러요
+    function outline(g) {
+      const add = [];
+      for (let y = 0; y < PIX; y++) for (let x = 0; x < PIX; x++) {
+        if (g[y][x] !== ".") continue;
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => (g[y + dy] || [])[x + dx] && g[y + dy][x + dx] !== ".")) add.push([x, y]);
+      }
+      pts(g, "o", add);
+    }
+    // 귀여운 얼굴: 눈 두 개(ex1, ex2, ey) + 볼터치 + 입
+    function face(g, ex1, ex2, ey, o) {
+      o = o || {};
+      const eye = o.screen ? "K" : "k";
+      pts(g, eye, [[ex1, ey], [ex2, ey]]);
+      if (o.tall) pts(g, eye, [[ex1, ey + 1], [ex2, ey + 1]]);
+      const by = ey + (o.tall ? 2 : 1);
+      if (!o.noBlush) pts(g, "p", [[ex1 - 1, by], [ex2 + 1, by]]);
+      if (!o.noMouth) { const mx = Math.floor((ex1 + ex2) / 2); pts(g, o.screen ? "K" : "k", [[mx, by], [mx + 1, by]]); }
+    }
+
+    const DRAW = {
+      umbrella(g) {
+        oval(g, 7.5, 8, 6.5, 6, "c", true);
+        pts(g, "c", [[1, 8], [2, 8], [3, 8], [6, 8], [7, 8], [8, 8], [9, 8], [12, 8], [13, 8], [14, 8]]);
+        pts(g, "m", [[3, 8], [6, 8], [9, 8], [12, 8]]);
+        outline(g);
+        pts(g, "o", [[7, 0], [8, 0], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [7, 14], [6, 14], [6, 13]]);
+        pts(g, "l", [[4, 4], [5, 3], [6, 3], [3, 5]]);
+        face(g, 5, 10, 6);
+      },
+      case(g) {
+        rect(g, 2, 4, 12, 9, "c");
+        pts(g, ".", [[2, 4], [13, 4], [2, 12], [13, 12]]);
+        outline(g);
+        rect(g, 3, 8, 10, 1, "m");
+        pts(g, "l", [[7, 6], [8, 6], [3, 5], [4, 5], [3, 6]]);
+        pts(g, "a", [[7, 8], [8, 8]]);
+        face(g, 5, 10, 10, { noMouth: false });
+      },
+      headphones(g) {
+        oval(g, 7.5, 8, 6, 6, "c", true);
+        oval(g, 7.5, 8, 3.7, 4, ".", true);
+        rect(g, 1, 8, 3, 6, "m");
+        rect(g, 12, 8, 3, 6, "m");
+        outline(g);
+        rect(g, 2, 9, 1, 4, "l");
+        rect(g, 13, 9, 1, 4, "l");
+        pts(g, "l", [[4, 3], [5, 2], [6, 2]]);
+      },
+      powerbank(g) {
+        rect(g, 1, 4, 14, 9, "c");
+        pts(g, ".", [[1, 4], [14, 4], [1, 12], [14, 12]]);
+        outline(g);
+        pts(g, "g", [[10, 6], [11, 6], [12, 6]]);
+        rect(g, 4, 12, 4, 1, "m");
+        pts(g, "l", [[2, 5], [3, 5], [2, 6]]);
+        face(g, 5, 8, 7, { noMouth: true });
+        pts(g, "k", [[6, 9], [7, 9]]);
+      },
+      plug(g) {
+        rect(g, 3, 5, 10, 8, "c");
+        pts(g, ".", [[3, 5], [12, 5], [3, 12], [12, 12]]);
+        rect(g, 5, 2, 2, 3, "a");
+        rect(g, 9, 2, 2, 3, "a");
+        rect(g, 7, 13, 2, 2, "m");
+        outline(g);
+        pts(g, "l", [[4, 6], [5, 6], [4, 7]]);
+        face(g, 6, 9, 8);
+      },
+      laptop(g) {
+        rect(g, 2, 2, 12, 9, "c");
+        rect(g, 3, 3, 10, 6, "s");
+        rect(g, 1, 11, 14, 2, "m");
+        outline(g);
+        pts(g, "w", [[3, 3], [4, 3]]);
+        face(g, 5, 10, 5, { screen: true });
+      },
+      phone(g) {
+        rect(g, 4, 1, 8, 14, "c");
+        rect(g, 5, 2, 6, 10, "s");
+        pts(g, "m", [[7, 13], [8, 13]]);
+        outline(g);
+        face(g, 6, 9, 6, { screen: true });
+        pts(g, "w", [[5, 2], [6, 2]]);
+      },
+      calculator(g) {
+        rect(g, 3, 1, 10, 14, "c");
+        rect(g, 4, 2, 8, 3, "y");
+        outline(g);
+        pts(g, "K", [[6, 3], [9, 3]]);
+        for (const y of [7, 9, 11, 13]) for (const x of [4, 7, 10]) { pts(g, "l", [[x, y], [x + 1, y]]); }
+      },
+      wallet(g) {
+        rect(g, 1, 3, 14, 10, "c");
+        pts(g, ".", [[1, 3], [14, 3], [1, 12], [14, 12]]);
+        rect(g, 10, 7, 5, 4, "m");
+        outline(g);
+        rect(g, 2, 5, 12, 1, "m");
+        pts(g, "l", [[2, 4], [3, 4]]);
+        pts(g, "w", [[12, 8], [12, 9]]);
+        face(g, 4, 7, 8, { noMouth: true });
+        pts(g, "k", [[5, 10], [6, 10]]);
+      },
+      key(g) {
+        oval(g, 4, 7.5, 3.6, 3.6, "c");
+        rect(g, 7, 7, 8, 2, "c");
+        rect(g, 11, 9, 1, 2, "c");
+        rect(g, 14, 9, 1, 2, "c");
+        outline(g);
+        pts(g, "w", [[3, 7], [4, 7], [3, 8], [4, 8]]);
+        pts(g, "l", [[3, 5], [4, 5]]);
+      },
+      tumbler(g) {
+        rect(g, 3, 2, 10, 3, "m");
+        rect(g, 4, 5, 8, 7, "c");
+        rect(g, 5, 12, 6, 3, "c");
+        outline(g);
+        pts(g, "l", [[5, 6], [5, 7]]);
+        pts(g, "a", [[5, 3], [6, 3]]);
+        face(g, 6, 9, 9);
+      },
+      pencilcase(g) {
+        rect(g, 1, 4, 14, 8, "c");
+        pts(g, ".", [[1, 4], [14, 4], [1, 11], [14, 11]]);
+        outline(g);
+        for (let x = 3; x <= 11; x += 2) setPx(g, x, 5, "m");
+        pts(g, "a", [[12, 5], [12, 6]]);
+        pts(g, "l", [[2, 5], [2, 6]]);
+        face(g, 5, 10, 8);
+      },
+      bag(g) {
+        pts(g, "m", [[6, 2], [7, 2], [8, 2], [9, 2], [5, 3], [10, 3]]);
+        rect(g, 3, 4, 10, 10, "c");
+        pts(g, ".", [[3, 4], [12, 4]]);
+        rect(g, 4, 10, 8, 3, "m");
+        outline(g);
+        pts(g, "l", [[7, 10], [8, 10]]);
+        pts(g, "l", [[4, 5], [4, 6]]);
+        face(g, 5, 10, 6);
+      },
+      book(g) {
+        rect(g, 3, 1, 10, 14, "c");
+        rect(g, 3, 1, 2, 14, "m");
+        rect(g, 5, 12, 8, 2, "w");
+        outline(g);
+        pts(g, "l", [[6, 3], [7, 3], [8, 3], [9, 3], [10, 3], [6, 4], [7, 4], [8, 4]]);
+        face(g, 7, 10, 7);
+      },
+      jacket(g) {
+        rect(g, 4, 2, 8, 12, "c");
+        rect(g, 1, 3, 3, 9, "c");
+        rect(g, 12, 3, 3, 9, "c");
+        pts(g, ".", [[7, 2], [8, 2]]);
+        rect(g, 1, 11, 3, 1, "m");
+        rect(g, 12, 11, 3, 1, "m");
+        rect(g, 4, 13, 8, 1, "m");
+        pts(g, "m", [[6, 2], [9, 2]]);
+        rect(g, 4, 5, 1, 6, "m");
+        rect(g, 11, 5, 1, 6, "m");
+        pts(g, "m", [[5, 2], [10, 2]]);
+        outline(g);
+        rect(g, 7, 9, 2, 4, "l");
+        pts(g, "l", [[5, 3], [5, 4]]);
+        face(g, 6, 9, 6);
+      },
+      shirt(g) {
+        rect(g, 4, 2, 8, 12, "c");
+        rect(g, 1, 3, 3, 4, "c");
+        rect(g, 12, 3, 3, 4, "c");
+        pts(g, ".", [[7, 2], [8, 2]]);
+        pts(g, "m", [[6, 2], [9, 2], [7, 3], [8, 3]]);
+        rect(g, 1, 6, 3, 1, "m");
+        rect(g, 12, 6, 3, 1, "m");
+        outline(g);
+        pts(g, "l", [[5, 4], [5, 5]]);
+        face(g, 5, 10, 8);
+      },
+      shoe(g) {
+        const rows = { 3: [2, 6], 4: [2, 6], 5: [2, 7], 6: [2, 9], 7: [2, 11], 8: [2, 13], 9: [2, 14], 10: [1, 14] };
+        for (const y in rows) rect(g, rows[y][0], +y, rows[y][1] - rows[y][0] + 1, 1, "c");
+        rect(g, 1, 11, 14, 2, "w");
+        rect(g, 2, 3, 5, 1, "m");
+        outline(g);
+        pts(g, "w", [[6, 5], [7, 6], [9, 7], [11, 8]]);
+        pts(g, "l", [[3, 5], [3, 6], [3, 7]]);
+        pts(g, "m", [[3, 12], [4, 12], [9, 12], [10, 12], [11, 12]]);
+        face(g, 9, 12, 9);
+      },
+      glasses(g) {
+        oval(g, 4, 8, 3.4, 3.4, "c");
+        oval(g, 11, 8, 3.4, 3.4, "c");
+        pts(g, "c", [[7, 7], [8, 7], [1, 6], [14, 6], [1, 5], [14, 5]]);
+        oval(g, 4, 8, 1.7, 1.7, "s");
+        oval(g, 11, 8, 1.7, 1.7, "s");
+        outline(g);
+        pts(g, "w", [[3, 7], [10, 7]]);
+      },
+      watch(g) {
+        rect(g, 6, 1, 4, 4, "m");
+        rect(g, 6, 11, 4, 4, "m");
+        oval(g, 7.5, 8, 4.7, 4.7, "c");
+        oval(g, 7.5, 8, 3, 3, "w");
+        pts(g, "a", [[13, 8]]);
+        outline(g);
+        pts(g, "K", [[7, 6], [7, 7], [7, 8], [8, 8], [9, 8]]);
+        pts(g, "l", [[4, 5], [5, 4]]);
+      },
+      cap(g) {
+        oval(g, 6.5, 10, 5.7, 7, "c", true);
+        rect(g, 1, 10, 12, 1, "m");
+        rect(g, 8, 10, 7, 2, "m");
+        pts(g, ".", [[1, 10], [14, 11]]);
+        outline(g);
+        pts(g, "m", [[6, 2]]);
+        pts(g, "l", [[3, 6], [4, 5], [5, 4]]);
+        face(g, 4, 8, 7, { noMouth: true });
+      },
+      ball(g) {
+        oval(g, 7.5, 7.5, 6.5, 6.5, "c");
+        outline(g);
+        rect(g, 7, 2, 2, 2, "m");
+        pts(g, "m", [[1, 8], [2, 8], [13, 8], [14, 8], [3, 12], [12, 12]]);
+        pts(g, "l", [[3, 4], [4, 3]]);
+        face(g, 5, 10, 8);
+      },
+    };
+
+    // 설명에 색이 없을 때 쓰는 기본 색 (귀여운 파스텔)
+    const DEFAULT_COLOR = {
+      umbrella: "#60a5fa", case: "#f8fafc", headphones: "#f472b6", powerbank: "#a78bfa",
+      plug: "#e2e8f0", laptop: "#cbd5e1", phone: "#94a3b8", calculator: "#fca5a5",
+      wallet: "#c08457", key: "#fbbf24", tumbler: "#5eead4", pencilcase: "#fda4af",
+      bag: "#7dd3fc", book: "#fb923c", jacket: "#86efac", shirt: "#fde047",
+      shoe: "#f8fafc", glasses: "#475569", watch: "#fb7185", cap: "#60a5fa", ball: "#f8fafc",
+    };
+
+    function lum(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    }
+
+    // 점 하나하나를 색칠한 작은 SVG로 바꿔요 (같은 색 가로줄은 한 덩어리로 합쳐요)
+    function svgFor(key, color) {
+      const c = color || DEFAULT_COLOR[key] || "#94a3b8";
+      const pal = {
+        o: shade(c, -0.55), c: c, m: shade(c, -0.22), l: shade(c, 0.55),
+        w: "#ffffff", s: "#e3f0ff", y: "#d9f7e2", g: "#4ade80", a: "#cbd5e1",
+        k: lum(c) < 90 ? "#ffffff" : "#2b2b3a", K: "#2b2b3a", p: "#ff9eb5",
+      };
+      const g = newGrid();
+      DRAW[key](g);
+      const byColor = {};
+      for (let y = 0; y < PIX; y++) {
+        let x = 0;
+        while (x < PIX) {
+          const ch = g[y][x];
+          if (ch === "." || !pal[ch]) { x++; continue; }
+          let e = x;
+          while (e + 1 < PIX && g[y][e + 1] === ch) e++;
+          (byColor[ch] = byColor[ch] || []).push(`M${x} ${y}h${e - x + 1}v1h-${e - x + 1}z`);
+          x = e + 1;
+        }
+      }
+      const paths = Object.keys(byColor).map(ch => `<path fill="${pal[ch]}" d="${byColor[ch].join("")}"/>`).join("");
+      return `<svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${paths}</svg>`;
+    }
+
+    // 그림을 그릴 수 있으면 그림으로, 아니면 이모지로 보여줌 (그림에는 글자가 아니라 정해진 색·모양만 들어갑니다)
+    function pictureFor(text) {
+      const t = String(text || "");
+      const hit = DRAWINGS.find(([re]) => re.test(t));
+      if (hit) {
+        const paint = PAINT.find(([re]) => re.test(t));
+        const c = paint ? paint[1] : DEFAULT_COLOR[hit[1]];
+        return { html: svgFor(hit[1], c), bg: lum(c) > 225 ? "#e8eef6" : shade(c, 0.86) };
+      }
+      const e = iconFor(t);
+      return { html: e.emoji, bg: e.bg };
+    }
+
     let items = [];
     let filter = "all";
 
@@ -198,12 +618,18 @@
         const isFound = it.kind === "found";
         const badgeClass = it.done ? "done" : (isFound ? "keep" : "lost");
         const badgeText = it.done ? (isFound ? "주인 찾음" : "물건 찾음") : (isFound ? "보관 중" : "찾는 중");
+        const pic = pictureFor(it.item);
         return `
         <div class="card ${it.done ? "done" : ""}">
-          <span class="badge ${badgeClass}">${badgeText}</span>
-          <div class="item">${esc(it.item || "(내용 없음)")}</div>
-          ${it.place ? `<div class="meta">📍 ${isFound ? "주운" : "잃어버린"} 장소: ${esc(it.place)}</div>` : ""}
-          ${it.time ? `<div class="meta">🕐 ${isFound ? "주운" : "잃어버린"} 시간: ${esc(it.time)}</div>` : ""}
+          <div class="card-main">
+            <div class="pic" style="background:${pic.bg}" aria-hidden="true">${pic.html}</div>
+            <div class="body">
+              <span class="badge ${badgeClass}">${badgeText}</span>
+              <div class="item">${esc(it.item || "(내용 없음)")}</div>
+              ${it.place ? `<div class="meta">📍 ${isFound ? "주운" : "잃어버린"} 장소: ${esc(it.place)}</div>` : ""}
+              ${it.time ? `<div class="meta">🕐 ${isFound ? "주운" : "잃어버린"} 시간: ${esc(it.time)}</div>` : ""}
+            </div>
+          </div>
           ${it.storage ? `<div class="storage ${isFound ? "" : "lost"}">${isFound ? "🗄️ 보관 장소" : "📬 찾으면 맡겨 주세요"}: ${esc(it.storage)}</div>` : ""}
         </div>`;
       }).join("");
