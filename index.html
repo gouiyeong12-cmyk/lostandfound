@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>남원여고 분실물 센터</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb; --card: #ffffff; --text: #1f2937; --sub: #6b7280;
+      --line: #e5e7eb; --main: #3b82f6; --found: #10b981; --lost: #ef4444; --keep: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+    header { text-align: center; padding: 16px 0 8px; }
+    header h1 { margin: 0 0 6px; font-size: 26px; }
+    header p { margin: 0; color: var(--sub); font-size: 14px; }
+
+    .btn-row { display: flex; gap: 8px; margin: 18px 0 8px; }
+    .btn {
+      flex: 1; text-align: center; text-decoration: none; color: #fff;
+      padding: 15px 8px; border-radius: 10px; font-weight: 700; font-size: 16px;
+    }
+    .btn.lost { background: var(--lost); }
+    .btn.found { background: var(--found); }
+    .btn.off { background: #9ca3af; }
+    .hint { text-align: center; font-size: 13px; color: var(--sub); margin: 0 0 16px; line-height: 1.6; }
+
+    .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .tools input[type=search] {
+      flex: 1 1 200px; padding: 12px; border: 1px solid var(--line);
+      border-radius: 10px; font-size: 15px; background: #fff;
+    }
+    .tabs { display: flex; gap: 6px; }
+    .tab {
+      border: 1px solid var(--line); background: #fff; padding: 10px 13px;
+      border-radius: 999px; font-size: 14px; cursor: pointer; color: var(--text);
+    }
+    .tab.on { background: var(--main); border-color: var(--main); color: #fff; }
+
+    .opt { font-size: 13px; color: var(--sub); margin: 6px 2px 8px; display: block; }
+    .opt input { vertical-align: middle; }
+    .notice { font-size: 13px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 9px 12px; margin: 6px 0; }
+    .count { font-size: 13px; color: var(--sub); margin: 8px 2px 4px; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 14px 16px; margin: 10px 0;
+    }
+    .card.done { opacity: .55; }
+    .badge {
+      display: inline-block; font-size: 12px; font-weight: 700; color: #fff;
+      padding: 3px 9px; border-radius: 999px; margin-bottom: 8px;
+    }
+    .badge.keep { background: var(--keep); }
+    .badge.lost { background: var(--lost); }
+    .badge.done { background: #9ca3af; }
+    .item { font-size: 16px; font-weight: 700; line-height: 1.5; white-space: pre-wrap; }
+    .meta { font-size: 13px; color: var(--sub); margin: 3px 0; }
+    .storage {
+      margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+      background: #ecfdf5; color: #065f46; font-size: 14px; font-weight: 600;
+    }
+    .storage.lost { background: #fef2f2; color: #991b1b; }
+
+    .msg { text-align: center; color: var(--sub); padding: 30px 0; font-size: 14px; }
+    .demo {
+      background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+      border-radius: 10px; padding: 10px 12px; font-size: 13px; margin: 12px 0;
+    }
+    .frame-title { font-size: 13px; font-weight: 700; margin: 12px 0 4px; }
+    footer { text-align: center; font-size: 12px; color: var(--sub); margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🔎 남원여고 분실물 센터</h1>
+      <p>잃어버렸거나 주운 물건을 여기서 찾고 알려 주세요.</p>
+    </header>
+
+    <div class="btn-row">
+      <a class="btn lost" id="btnLost" target="_blank" rel="noopener">😢 물건을 잃어버렸어요</a>
+      <a class="btn found" id="btnFound" target="_blank" rel="noopener">😊 물건을 주웠어요</a>
+    </div>
+    <p class="hint">잃어버렸다면 아래 목록에서 먼저 찾아보세요.<br>내 물건이 보관 중이면 <b>보관 장소</b>로 가면 돼요.</p>
+
+    <div id="demoNote" class="demo" style="display:none">
+      지금은 <b>미리보기(샘플 데이터)</b> 모드입니다. 아래 <code>설정</code> 부분에 시트 링크를 넣으면 실제 데이터가 표시됩니다.
+    </div>
+
+    <div class="tools">
+      <input type="search" id="q" placeholder="물건, 장소로 검색 (예: 에어팟, 체육관)">
+      <div class="tabs">
+        <button class="tab on" data-f="all">전체</button>
+        <button class="tab" data-f="found">주웠어요</button>
+        <button class="tab" data-f="lost">잃어버렸어요</button>
+      </div>
+    </div>
+    <label class="opt"><input type="checkbox" id="hideDone"> 주인 찾은 물건은 숨기기</label>
+    <div id="notice"></div>
+    <div class="count" id="count"></div>
+
+    <div id="list"><div class="msg">불러오는 중...</div></div>
+
+    <footer>남원여고 드림 스타트업 프로젝트 · 보낸 내용은 몇 분 뒤 목록에 반영됩니다</footer>
+  </div>
+
+  <script>
+    /* ===================== 설정 (여기만 바꾸세요) ===================== */
+    // [주웠어요] 구글 폼 링크 / 시트 '공개용' 탭의 CSV 게시 링크  (연결 완료)
+    const FOUND_FORM_URL = "https://forms.gle/AXCREFAJywUDhd859";
+    const FOUND_CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRQL7AOccg-1JtX0uUqWTsCdhwl3GW5aXu-dYB_Dh7hLEZDFkTRQbbPScsjhaD66ugmHSIC-KSU4XnT/pub?gid=853036196&single=true&output=csv";
+
+    // [잃어버렸어요] 새로 만든 구글 폼 링크 / 시트 '공개용' 탭의 CSV 게시 링크
+    //  ※ 아직 만들기 전이면 그대로 두세요. 버튼은 '준비 중'으로 표시됩니다.
+    const LOST_FORM_URL  = "https://forms.gle/bPd212QJvoUoSZcr9";
+    const LOST_CSV_URL   = "여기에_잃어버렸어요_CSV_링크";
+
+    // 시트의 열 제목에 아래 글자가 포함되어 있으면 해당 칸으로 인식합니다.
+    const KEYWORDS = {
+      found: { item: "주운 물건",     place: "주운 장소",     time: "주운 시간",     storage: "보관", status: "상태" },
+      lost:  { item: "잃어버린 물건", place: "잃어버린 장소", time: "잃어버린 시간", storage: "맡겨", status: "상태" },
+    };
+    /* ================================================================= */
+
+    const isSet = (v) => v && !v.startsWith("여기에_");
+    const $ = (id) => document.getElementById(id);
+
+    // 보안: 사용자가 입력한 글이 코드로 실행되지 않도록 변환
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+      ));
+    }
+
+    // 버튼 연결 (링크가 없으면 '준비 중' 표시)
+    function setupButton(id, url) {
+      const b = $(id);
+      if (isSet(url)) { b.href = url; return; }
+      b.href = "#";
+      b.classList.add("off");
+      b.textContent += " (준비 중)";
+      b.addEventListener("click", (e) => { e.preventDefault(); alert("아직 준비 중이에요. 조금만 기다려 주세요!"); });
+    }
+    setupButton("btnLost", LOST_FORM_URL);
+    setupButton("btnFound", FOUND_FORM_URL);
+
+    // 열 제목에서 키워드가 들어간 열을 찾아 값을 가져옴
+    // 개인정보 보호: 제목에 '사람'이 들어간 열(주운 사람/잃어버린 사람 정보)은 절대 읽지 않음
+    function pick(row, kind, key) {
+      const header = Object.keys(row)
+        .filter(h => !h.includes("사람"))
+        .find(h => h.trim().includes(KEYWORDS[kind][key]));
+      return header ? (row[header] || "").trim() : "";
+    }
+
+    function normalize(row, kind) {
+      const status = pick(row, kind, "status");
+      return {
+        kind,
+        item: pick(row, kind, "item"),
+        place: pick(row, kind, "place"),
+        time: pick(row, kind, "time"),
+        storage: pick(row, kind, "storage"),
+        status,
+        done: /찾음|완료|반환/.test(status),
+      };
+    }
+
+    let items = [];
+    let filter = "all";
+
+    function render() {
+      const q = $("q").value.trim().toLowerCase();
+      const hideDone = $("hideDone").checked;
+
+      const shown = items.filter(it => {
+        if (filter !== "all" && it.kind !== filter) return false;
+        if (hideDone && it.done) return false;
+        if (q && !(it.item + " " + it.place + " " + it.storage).toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      $("count").textContent = `총 ${shown.length}개`;
+
+      if (!shown.length) {
+        $("list").innerHTML = '<div class="msg">조건에 맞는 글이 없어요.</div>';
+        return;
+      }
+
+      $("list").innerHTML = shown.map(it => {
+        const isFound = it.kind === "found";
+        const badgeClass = it.done ? "done" : (isFound ? "keep" : "lost");
+        const badgeText = it.done ? (isFound ? "주인 찾음" : "물건 찾음") : (isFound ? "보관 중" : "찾는 중");
+        return `
+        <div class="card ${it.done ? "done" : ""}">
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <div class="item">${esc(it.item || "(내용 없음)")}</div>
+          ${it.place ? `<div class="meta">📍 ${isFound ? "주운" : "잃어버린"} 장소: ${esc(it.place)}</div>` : ""}
+          ${it.time ? `<div class="meta">🕐 ${isFound ? "주운" : "잃어버린"} 시간: ${esc(it.time)}</div>` : ""}
+          ${it.storage ? `<div class="storage ${isFound ? "" : "lost"}">${isFound ? "🗄️ 보관 장소" : "📬 찾으면 맡겨 주세요"}: ${esc(it.storage)}</div>` : ""}
+        </div>`;
+      }).join("");
+    }
+
+    // 이벤트
+    $("q").addEventListener("input", render);
+    $("hideDone").addEventListener("change", render);
+    document.querySelectorAll(".tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(b => b.classList.remove("on"));
+        btn.classList.add("on");
+        filter = btn.dataset.f;
+        render();
+      });
+    });
+
+    // 샘플 데이터 (시트 링크를 아직 안 넣었을 때 미리보기용)
+    const SAMPLE_FOUND = [
+      { "주운 물건": "검정색 에어팟 케이스 (흰색 스티커가 붙어 있어요)", "물건을 주운 장소": "체육관 앞", "물건을 주운 시간": "10월 22일 점심시간", "보관 장소": "2학년 교무실", "처리 상태": "" },
+      { "주운 물건": "수학 문제집 (표지에 '민' 글자)", "물건을 주운 장소": "도서관", "물건을 주운 시간": "10월 19일 방과 후", "보관 장소": "2학년 교무실", "처리 상태": "주인 찾음" },
+    ];
+    const SAMPLE_LOST = [
+      { "잃어버린 물건": "파란색 체육복 상의", "물건을 잃어버린 장소": "운동장 근처", "물건을 잃어버린 시간": "10월 21일 5교시", "찾으면 맡겨 주세요": "1학년 교무실", "처리 상태": "" },
+    ];
+
+    // 시트(CSV) 한 개를 읽어옴
+    function loadFeed(kind, url) {
+      return new Promise(resolve => {
+        // 주소 뒤에 시간값을 붙여 캐시된 옛날 데이터가 나오지 않게 함
+        const u = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+        Papa.parse(u, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: (res) => resolve({
+            kind, ok: true,
+            items: res.data.map(r => normalize(r, kind)).filter(it => it.item || it.place).reverse(), // 최신 글이 위로
+          }),
+          error: () => resolve({ kind, ok: false, items: [] }),
+        });
+      });
+    }
+
+    // 모든 목록을 못 불러왔을 때: 이유를 알려주고 시트 '간단 보기'를 대신 보여줌
+    // (파일을 더블클릭해서 열면 구글이 데이터 요청을 막기 때문에 이 경우가 생김)
+    function showFallback(feeds) {
+      const onFile = location.protocol === "file:";
+      const why = onFile
+        ? "이 파일을 <b>더블클릭해서 직접 열면</b> 구글이 데이터를 막아서 카드 목록을 만들 수 없어요. 인터넷에 올린 주소(GitHub Pages 등)로 열면 정상적으로 보여요. 아래는 임시로 보여주는 간단 보기예요."
+        : "데이터를 불러오지 못했어요. 인터넷 연결이나 시트의 '웹에 게시' 설정을 확인해 주세요. 아래는 임시로 보여주는 간단 보기예요.";
+      const label = { found: "주웠어요 목록", lost: "잃어버렸어요 목록" };
+      $("count").textContent = "";
+      $("list").innerHTML =
+        '<div class="demo">' + why + '</div>' +
+        feeds.map(f => {
+          const embed = f.url.replace("/pub?", "/pubhtml?").replace("&output=csv", "&widget=true&headers=false");
+          return '<div class="frame-title">' + label[f.kind] + '</div>' +
+            '<iframe src="' + esc(embed) + '" style="width:100%;height:320px;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>';
+        }).join("") +
+        '<p class="hint"><a href="#" onclick="location.reload();return false">다시 시도</a></p>';
+    }
+
+    async function load() {
+      const feeds = [
+        { kind: "found", url: FOUND_CSV_URL },
+        { kind: "lost",  url: LOST_CSV_URL },
+      ].filter(f => isSet(f.url));
+
+      // 시트 링크가 하나도 없으면 샘플로 미리보기
+      if (!feeds.length) {
+        $("demoNote").style.display = "block";
+        items = [
+          ...SAMPLE_FOUND.map(r => normalize(r, "found")),
+          ...SAMPLE_LOST.map(r => normalize(r, "lost")),
+        ];
+        render();
+        return;
+      }
+
+      const results = await Promise.all(feeds.map(f => loadFeed(f.kind, f.url)));
+      const failed = results.filter(r => !r.ok);
+
+      if (failed.length === results.length) {
+        showFallback(feeds.filter(f => failed.some(r => r.kind === f.kind)));
+        return;
+      }
+
+      // 주웠어요 목록 먼저, 그다음 잃어버렸어요 목록
+      items = [].concat(...["found", "lost"].map(k => (results.find(r => r.kind === k) || { items: [] }).items));
+
+      const notes = [];
+      if (!isSet(LOST_CSV_URL)) notes.push("잃어버렸어요 목록은 곧 열려요.");
+      if (failed.length) notes.push("일부 목록(" + failed.map(r => r.kind === "found" ? "주웠어요" : "잃어버렸어요").join(", ") + ")을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.");
+      $("notice").innerHTML = notes.map(n => '<div class="notice">' + esc(n) + '</div>').join("");
+
+      render();
+    }
+
+    load();
+  </script>
+</body>
+</html>
